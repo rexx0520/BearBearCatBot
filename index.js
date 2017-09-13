@@ -4,23 +4,24 @@ var jsonfile = require('jsonfile')
 var botSecret = jsonfile.readFileSync('./secret.json'); // bot 資訊
 var TelegramBot = require('node-telegram-bot-api'); //api
 var bot = new TelegramBot(botSecret.botToken, { polling: true });
+var request = require("request"); // HTTP 客戶端輔助工具
+var cheerio = require("cheerio"); // Server 端的 jQuery 實作
 
 // log
 function log(message, parse_mode = "markdown") {
     console.log(message);
-    for (i in botSecret.logChannelId) {
-        bot.sendMessage(botSecret.logChannelId[i], message, { parse_mode: parse_mode });
-    }
+    if (botSecret.logChannelId != undefined)
+        for (i in botSecret.logChannelId) bot.sendMessage(botSecret.logChannelId[i], message, { parse_mode: parse_mode });
 }
 
 // 啟動成功
 var start_time = new Date().getHours() + ":" + new Date().getMinutes() + ":" + new Date().getSeconds(); // 機器人啟動時間
-log("`[系統]`熊貓貓在 " + start_time + " 時啟動成功");
+log("`[系統]`熊貓貓二號在 " + start_time + " 時啟動成功");
 
 // /start
 bot.onText(/\/start/, function(msg) {
     var chatId = msg.chat.id;
-    var resp = '哈囉！這裡是熊貓貓';
+    var resp = '哈囉！這裡是熊貓貓二號';
     bot.sendMessage(chatId, resp);
 });
 
@@ -41,17 +42,24 @@ bot.onText(/\/help/, function(msg) {
         },
         {
             Command: 'viewCombo',
-            Description: "查看手賤賤及笨蛋的 Combo",
+            Description: "查看手賤賤及笨蛋的 Combo，回復別人訊息可取得該使用者的 Combo",
         },
         {
             Command: 'cleanCombo',
             Description: "清除手賤賤及笨蛋的 Combo(無法復原)",
         },
+        {
+            Command: 'dayoff',
+            Description: "查看行政院人事行政總處是否公布放假，支援地名、上班/上課/停班/停課 關鍵字查詢。",
+        },
+        {
+            Command: 'clearDayffCache',
+            Description: "清除上班上課的 cache。",
+        },
+
     ];
     var resp = '';
-    for (i = 0; i < helpCommand.length; i = i + 1) {
-        var resp = resp + '/' + helpCommand[i].Command + '\n     ' + helpCommand[i].Description + '\n';
-    }
+    for (i in helpCommand) resp = resp + '/' + helpCommand[i].Command + '\n     ' + helpCommand[i].Description + '\n';
     bot.sendMessage(chatId, resp);
 });
 
@@ -61,6 +69,62 @@ bot.onText(/\/echo (.+)/, function(msg, match) {
     bot.sendMessage(msg.chat.id, resp, { parse_mode: "HTML", reply_to_message_id: msg.message_id });
 });
 
+// 放假資訊
+var dayOffInfoCache = ["", "", true]; // [data, time, alive status (true/false)]
+
+function dayOffInfo(key = 'all', cb) {
+    function _getDayoffValue(keyword = key) {
+        var resp = "";
+        if (keyword == 'all')
+            resp = dayOffInfoCache[0];
+        else if (keyword.match(/班|課/)) {
+            var dayOffInfoCacheSplit = dayOffInfoCache[0].split("\n");
+            var searchKeyWord = ['照常上班', '照常上課'];
+            if (keyword.match('停班')) searchKeyWord[0] = '停止上班';
+            if (keyword.match('停課')) searchKeyWord[1] = '停止上課';
+
+            for (i in dayOffInfoCacheSplit)
+                if (dayOffInfoCacheSplit[i].indexOf(searchKeyWord[0]) != -1 && dayOffInfoCacheSplit[i].indexOf(searchKeyWord[1]) != -1)
+                    resp += dayOffInfoCacheSplit[i] + '\n';
+        } else { // 匹配地名
+            var dayOffInfoCacheSplit = dayOffInfoCache[0].split("\n");
+            for (i in dayOffInfoCacheSplit)
+                if (dayOffInfoCacheSplit[i].indexOf(keyword) != -1) resp += dayOffInfoCacheSplit[i] + '\n';
+        }
+        (resp == "") ? resp = "找不到資料!": resp += '---\n`最新情報以` [行政院人事行政總處](https://www.dgpa.gov.tw/typh/daily/nds.html) `公告為主`\n' + dayOffInfoCache[1];
+        return resp;
+    }
+    if (dayOffInfoCache[0] == "" || !dayOffInfoCache[2]) {
+        request({
+                url: "https://www.dgpa.gov.tw/typh/daily/nds.html",
+                method: "GET",
+                rejectUnauthorized: false
+            }, function(e, r, b) {
+                if (e || !b) return;
+                var $ = cheerio.load(b);
+                var titles = $("body>table:nth-child(2)>tbody>tr>td:nth-child(1)>font");
+                var status = $("body>table:nth-child(2)>tbody>tr>td:nth-child(2)>font");
+                dayOffInfoCache[1] = $("td[headers=\"T_PA date\"]>p>font").text();
+                for (var i = 0; i < titles.length; i++) dayOffInfoCache[0] += '*' + $(titles[i]).text() + '*：' + $(status[i]).text() + '\n'; // Cache
+                dayOffInfoCache[2] = true;
+                cb(_getDayoffValue());
+            })
+            /* e: 錯誤代碼 */
+            /* b: 傳回的資料內容 */
+    } else {
+        cb(_getDayoffValue());
+    }
+}
+// 放假
+bot.onText(/\/dayoff/, function(msg) {
+    var keyword = msg.text.split(" ");
+    dayOffInfo(keyword[1] ? keyword[1] : 'all',
+        cb = result => bot.sendMessage(msg.chat.id, result, { parse_mode: "markdown", reply_to_message_id: msg.message_id }));
+});
+bot.onText(/\/clearDayffCache/, function(msg) {
+    dayOffInfoCache[2] = false;
+    bot.sendMessage(msg.chat.id, 'cache 已清除!', { parse_mode: "markdown", reply_to_message_id: msg.message_id });
+});
 
 //鍵盤新增跟移除
 bot.onText(/\/addKeyboard/, function(msg) {
@@ -123,75 +187,73 @@ bot.on('message', (msg) => {
         "\n 發送時間：" + msg.date +
         "\n 訊息文字：" + msg.text +
         "</code>"
-    bot.sendMessage('-1001143743775', SendLog2Ch, { parse_mode: "HTML" });
+    log(SendLog2Ch, parse_mode = "HTML");
     // 當有讀到文字時
     if (msg.text != undefined) {
-        // 發 幹 的時候回復
-        if (msg.text.toLowerCase().indexOf("幹") === 0) {
-            bot.sendMessage(msg.chat.id, "<i>QQ</i>", { parse_mode: "HTML", reply_to_message_id: msg.message_id });
-        }
-        // 發 Ping 的時候回復
-        if (msg.text.toLowerCase().indexOf("ping") === 0) {
-            bot.sendMessage(msg.chat.id, "<b>PONG</b>", { parse_mode: "HTML", reply_to_message_id: msg.message_id });
-        }
-        if (msg.text.toLowerCase().indexOf("ㄈㄓ") === 0) {
-            bot.sendMessage(msg.chat.id, "油", { reply_to_message_id: msg.message_id });
-        }
-        if (msg.text.toLowerCase().indexOf("晚安") === 0) {
-            bot.sendMessage(msg.chat.id, msg.from.first_name + "晚安❤️", { reply_to_message_id: msg.message_id });
-        }
-        if (msg.text.toLowerCase().indexOf("喵") === 0) {
-            bot.sendMessage(msg.chat.id, "`HTTP /1.1 200 OK.`", { parse_mode: "markdown", reply_to_message_id: msg.message_id });
-        }
-        if (msg.text.toLowerCase().indexOf('我是笨蛋') === 0) {
-            count_stupid(msg);
-        }
-        if (msg.text.toLowerCase().indexOf('我手賤賤') === 0) {
-            count_bitchhand(msg);
-        }
-        if (msg.text == '怕') {
-            bot.sendMessage(msg.chat.id, "嚇到吃手手", { parse_mode: "markdown", reply_to_message_id: msg.message_id });
-        }
+        keywords = ['幹', 'ping', 'ㄈㄓ', '晚安', '喵', '我是笨蛋', '我手賤賤', '怕']
+        actions = {
+                '幹': function() { bot.sendMessage(msg.chat.id, "<i>QQ</i>", { parse_mode: "HTML", reply_to_message_id: msg.message_id }); },
+                'ping': function() { bot.sendMessage(msg.chat.id, "<b>PONG</b>", { parse_mode: "HTML", reply_to_message_id: msg.message_id }); },
+                'ㄈㄓ': function() { bot.sendMessage(msg.chat.id, "油", { reply_to_message_id: msg.message_id }); },
+                "晚安": function() { bot.sendMessage(msg.chat.id, msg.from.first_name + "晚安❤️", { reply_to_message_id: msg.message_id }); },
+                "喵": function() { bot.sendMessage(msg.chat.id, "`HTTP /1.1 200 OK.`", { parse_mode: "markdown", reply_to_message_id: msg.message_id }); },
+                '我是笨蛋': function() { count_stupid(msg); },
+                '我手賤賤': function() { count_bitchhand(msg); },
+                '怕': function() { bot.sendMessage(msg.chat.id, "嚇到吃手手", { parse_mode: "markdown", reply_to_message_id: msg.message_id }); }
+            }
+            // 如果訊息符合 keywords 裡面的字的話就 actions[關鍵字]
+        for (i in keywords)
+            if (msg.text.toLowerCase().indexOf(keywords[i]) === 0) actions[keywords[i]];
     }
 });
-// 我是笨蛋集我手賤賤的記數
+
+// 我是笨蛋跟我手賤賤的記數
 var stupid = jsonfile.readFileSync('stupid.owo')
 var bitchhand = jsonfile.readFileSync('bitchhand.owo')
+jsonedit = false;
 
 function count_stupid(msg) {
-    var combo = stupid[msg.from.id]
-    if (!combo) {
-        combo = 1;
-    } else {
-        combo = combo + 1;
-    }
+    combo = (!stupid[msg.from.id]) ? 1 : combo + 1;
     var resp = "笨笨"
-    if (combo > 4) { var resp = "[" + combo + " Combo]" }
-    if (combo > 20) { var resp = "笨蛋沒有極限" + "\n[" + combo + " Combo]" }
-    if (combo > 40) { var resp = "你這智障" + "\n[" + combo + " Combo]" }
-    if (combo > 60) { var resp = "[" + combo + " Combo]" }
-    bot.sendMessage(msg.chat.id, resp, { parse_mode: "markdown", reply_to_message_id: msg.message_id });
-
-    //存檔
+    var combo_count = "\n[" + combo + " Combo]";
+    comboMax = [
+        [60, ''],
+        [40, "你這智障"],
+        [20, "笨蛋沒有極限"],
+        [4, '']
+    ];
+    for (i in comboMax) { if (combo > comboMax[i][0]) { resp = comboMax[i][1] + combo_count; break; } }
+    bot.sendMessage(msg.chat.id, resp, { reply_to_message_id: msg.message_id });
+    // 寫入字串
     stupid[msg.from.id] = combo;
-    jsonfile.writeFileSync('stupid.owo', stupid)
+    //存檔偵測
+    jsonedit = true;
 }
 
 function count_bitchhand(msg) {
-    var combo = bitchhand[msg.from.id];
-    if (!combo) {
-        combo = 1;
-    } else {
-        combo = combo + 1;
-    }
+    combo = (!bitchhand[msg.from.id]) ? 1 : combo + 1;
     var resp = "走開"
-    if (combo > 4) { var resp = "[" + combo + " Combo]" }
-    if (combo > 20) { var resp = "走開，你這賤人" + "\n[" + combo + " Combo]" }
-    if (combo > 40) { var resp = "你這臭 Bitch" + "\n[" + combo + " Combo]" }
-    if (combo > 60) { var resp = "[" + combo + " Combo]" }
-    bot.sendMessage(msg.chat.id, resp, { parse_mode: "markdown", reply_to_message_id: msg.message_id });
-
-    //存檔
+    var combo_count = "\n[" + combo + " Combo]";
+    comboMax = [
+        [60, ''],
+        [40, "你這臭 Bitch"],
+        [20, "走開，你這賤人"],
+        [4, '']
+    ];
+    for (i in comboMax) { if (combo > comboMax[i][0]) { resp = comboMax[i][1] + combo_count; break; } }
+    bot.sendMessage(msg.chat.id, resp, { reply_to_message_id: msg.message_id });
+    // 寫入字串
     bitchhand[msg.from.id] = combo;
-    jsonfile.writeFileSync('bitchhand.owo', bitchhand)
+    //存檔偵測
+    jsonedit = true;
 }
+//存檔
+var writeFile = function() {
+    if (jsonedit) {
+        jsonfile.writeFileSync('bitchhand.owo', bitchhand);
+        jsonfile.writeFileSync('stupid.owo', stupid);
+        //存檔偵測
+        jsonedit = false;
+    }
+};
+setInterval(writeFile, 8000);
