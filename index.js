@@ -53,13 +53,13 @@ bot.onText(/\/help/, function(msg) {
             Description: "查看行政院人事行政總處是否公布放假，支援地名、上班/上課/停班/停課 關鍵字查詢。",
         },
         {
-            Command: 'clearDayffCache',
+            Command: 'clearDayoffCache',
             Description: "清除上班上課的 cache。",
         },
 
     ];
     var resp = '';
-    for (i in helpCommand) resp = resp + '/' + helpCommand[i].Command + '\n     ' + helpCommand[i].Description + '\n';
+    for (i of helpCommand) resp += '/' + i.Command + '\n     ' + i.Description + '\n';
     bot.sendMessage(chatId, resp);
 });
 
@@ -83,13 +83,13 @@ function dayOffInfo(key = 'all', cb) {
             if (keyword.match('停班')) searchKeyWord[0] = '停止上班';
             if (keyword.match('停課')) searchKeyWord[1] = '停止上課';
 
-            for (i in dayOffInfoCacheSplit)
-                if (dayOffInfoCacheSplit[i].indexOf(searchKeyWord[0]) != -1 && dayOffInfoCacheSplit[i].indexOf(searchKeyWord[1]) != -1)
-                    resp += dayOffInfoCacheSplit[i] + '\n';
+            for (i of dayOffInfoCacheSplit)
+                if (i.indexOf(searchKeyWord[0]) != -1 && i.indexOf(searchKeyWord[1]) != -1)
+                    resp += i + '\n';
         } else { // 匹配地名
             var dayOffInfoCacheSplit = dayOffInfoCache[0].split("\n");
-            for (i in dayOffInfoCacheSplit)
-                if (dayOffInfoCacheSplit[i].indexOf(keyword) != -1) resp += dayOffInfoCacheSplit[i] + '\n';
+            for (i of dayOffInfoCacheSplit)
+                if (i.indexOf(keyword) != -1) resp += i + '\n';
         }
         (resp == "") ? resp = "找不到資料!": resp += '---\n`最新情報以` [行政院人事行政總處](https://www.dgpa.gov.tw/typh/daily/nds.html) `公告為主`\n' + dayOffInfoCache[1];
         return resp;
@@ -121,7 +121,7 @@ bot.onText(/\/dayoff/, function(msg) {
     dayOffInfo(keyword[1] ? keyword[1] : 'all',
         cb = result => bot.sendMessage(msg.chat.id, result, { parse_mode: "markdown", reply_to_message_id: msg.message_id }));
 });
-bot.onText(/\/clearDayffCache/, function(msg) {
+bot.onText(/\/clearDayoffCache/, function(msg) {
     dayOffInfoCache[2] = false;
     bot.sendMessage(msg.chat.id, 'cache 已清除!', { parse_mode: "markdown", reply_to_message_id: msg.message_id });
 });
@@ -202,8 +202,8 @@ bot.on('message', (msg) => {
                 '怕': function() { bot.sendMessage(msg.chat.id, "嚇到吃手手", { parse_mode: "markdown", reply_to_message_id: msg.message_id }); }
             }
             // 如果訊息符合 keywords 裡面的字的話就 actions[關鍵字]
-        for (i in keywords)
-            if (msg.text.toLowerCase().indexOf(keywords[i]) === 0) actions[keywords[i]];
+        for (i of keywords)
+            if (msg.text.toLowerCase().indexOf(i) === 0) actions[i];
     }
 });
 
@@ -222,7 +222,7 @@ function count_stupid(msg) {
         [20, "笨蛋沒有極限"],
         [4, '']
     ];
-    for (i in comboMax) { if (combo > comboMax[i][0]) { resp = comboMax[i][1] + combo_count; break; } }
+    for (i of comboMax) { if (combo > i[0]) { resp = i[1] + combo_count; break; } }
     bot.sendMessage(msg.chat.id, resp, { reply_to_message_id: msg.message_id });
     // 寫入字串
     stupid[msg.from.id] = combo;
@@ -240,7 +240,7 @@ function count_bitchhand(msg) {
         [20, "走開，你這賤人"],
         [4, '']
     ];
-    for (i in comboMax) { if (combo > comboMax[i][0]) { resp = comboMax[i][1] + combo_count; break; } }
+    for (i of comboMax) { if (combo > i[0]) { resp = i[1] + combo_count; break; } }
     bot.sendMessage(msg.chat.id, resp, { reply_to_message_id: msg.message_id });
     // 寫入字串
     bitchhand[msg.from.id] = combo;
