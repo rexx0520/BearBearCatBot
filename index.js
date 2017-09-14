@@ -100,13 +100,14 @@ function dayOffInfo(key = 'all', cb) {
                 method: "GET",
                 rejectUnauthorized: false
             }, function(e, r, b) {
+                dayOffInfoCache = ['', '', true];
                 if (e || !b) return;
                 var $ = cheerio.load(b);
                 var titles = $("body>table:nth-child(2)>tbody>tr>td:nth-child(1)>font");
                 var status = $("body>table:nth-child(2)>tbody>tr>td:nth-child(2)>font");
                 dayOffInfoCache[1] = $("td[headers=\"T_PA date\"]>p>font").text();
                 for (var i = 0; i < titles.length; i++) dayOffInfoCache[0] += '*' + $(titles[i]).text() + '*：' + $(status[i]).text() + '\n'; // Cache
-                dayOffInfoCache[2] = true;
+                if (dayOffInfoCache[0].endsWith('：\n')) dayOffInfoCache[0] = dayOffInfoCache[0].slice(0, -2) + '\n';
                 cb(_getDayoffValue());
             })
             /* e: 錯誤代碼 */
