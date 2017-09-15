@@ -204,7 +204,7 @@ bot.on('message', (msg) => {
             }
             // 如果訊息符合 keywords 裡面的字的話就 actions[關鍵字]
         for (i of keywords)
-            if (msg.text.toLowerCase().indexOf(i) === 0) actions[i];
+            if (msg.text.toLowerCase().indexOf(i) === 0) actions[i]();
     }
 });
 
