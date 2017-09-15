@@ -191,7 +191,6 @@ bot.on('message', (msg) => {
     log(SendLog2Ch, parse_mode = "HTML");
     // 當有讀到文字時
     if (msg.text != undefined) {
-        keywords = ['幹', 'ping', 'ㄈㄓ', '晚安', '喵', '我是笨蛋', '我手賤賤', '怕']
         actions = {
                 '幹': function() { bot.sendMessage(msg.chat.id, "<i>QQ</i>", { parse_mode: "HTML", reply_to_message_id: msg.message_id }); },
                 'ping': function() { bot.sendMessage(msg.chat.id, "<b>PONG</b>", { parse_mode: "HTML", reply_to_message_id: msg.message_id }); },
@@ -203,7 +202,7 @@ bot.on('message', (msg) => {
                 '怕': function() { bot.sendMessage(msg.chat.id, "嚇到吃手手", { parse_mode: "markdown", reply_to_message_id: msg.message_id }); }
             }
             // 如果訊息符合 keywords 裡面的字的話就 actions[關鍵字]
-        for (i of keywords)
+        for (i in actions)
             if (msg.text.toLowerCase().indexOf(i) === 0) actions[i]();
     }
 });
