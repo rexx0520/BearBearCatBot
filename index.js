@@ -201,7 +201,7 @@ bot.on('message', (msg) => {
                 '我手賤賤': function() { count_bitchhand(msg); },
                 '怕': function() { bot.sendMessage(msg.chat.id, "嚇到吃手手", { parse_mode: "markdown", reply_to_message_id: msg.message_id }); }
             }
-            // 如果訊息符合 keywords 裡面的字的話就 actions[關鍵字]
+            // 如果訊息符合 actions 的 key 裡面的字的話就執行 value
         for (i in actions)
             if (msg.text.toLowerCase().indexOf(i) === 0) actions[i]();
     }
